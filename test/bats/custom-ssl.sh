@@ -52,7 +52,7 @@ function testSSL() {
 
 @test "roundcube uses secure connection" {
   run docker exec "$CONTAINER" cat /opt/roundcube/config/config.inc.php
-  echo "$output" | grep "\$config\['default_host'\] = 'ssl://$HOSTNAME_EMAIL:993';"
+  echo "$output" | grep "\$config\['imap_host'\] = 'ssl://$HOSTNAME_EMAIL:993';"
   echo "$output" | grep "\$config\['smtp_server'\] = 'tls://$HOSTNAME_EMAIL';"
   echo "$output" | grep "\$config\['smtp_port'\] = 587;"
   docker exec "$CONTAINER" grep -E -R "^disable_plaintext_auth = yes" "/etc/dovecot"
