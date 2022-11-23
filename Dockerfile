@@ -20,10 +20,10 @@
 # https://www.howtoforge.com/update-the-ispconfig-perfect-server-from-debian-10-to-debian-11/
 #
 
-FROM debian:bullseye-slim
+FROM debian:testing-slim
 
 LABEL maintainer="mail@jcrooke.net"
-LABEL description="ISPConfig 3.2 on Debian Bullseye, with Roundcube mail, phpMyAdmin and more"
+LABEL description="ISPConfig 3.2 on Debian Bookworm, with Roundcube mail, phpMyAdmin and more"
 
 # Frequent: versioning
 ARG BUILD_ISPCONFIG_VERSION="3.2.9"
@@ -48,8 +48,9 @@ ARG BUILD_PHPMYADMIN="yes"
 ARG BUILD_PHPMYADMIN_PW="phpmyadmin"
 ARG BUILD_PHPMYADMIN_USER="phpmyadmin"
 ARG BUILD_PRINTING="no"
-ARG BUILD_PUREFTPD_VERSION_BASE="1.0.49"
-ARG BUILD_PUREFTPD_VERSION_FULL="1.0.49-4.1"
+# https://packages.debian.org/bookworm/pure-ftpd-common
+ARG BUILD_PUREFTPD_VERSION_BASE="1.0.50"
+ARG BUILD_PUREFTPD_VERSION_FULL="${BUILD_PUREFTPD_VERSION_BASE}-2.1+b2"
 ARG BUILD_REDIS="yes"
 ARG BUILD_ROUNDCUBE_DB="roundcube"
 ARG BUILD_ROUNDCUBE_DIR="/opt/roundcube"
@@ -110,14 +111,16 @@ RUN if [ "${BUILD_MYSQL_HOST}" = "localhost" ]; then \
         exit 1; \
     fi; \
 # --- 8b Install Postfix, Dovecot, and Binutils
-    apt-get -qq -o Dpkg::Use-Pty=0 update && apt-get -qq -o Dpkg::Use-Pty=0 --no-install-recommends install postfix postfix-mysql postfix-doc getmail rkhunter binutils dovecot-imapd dovecot-pop3d dovecot-mysql dovecot-sieve dovecot-lmtpd libsasl2-modules && \
+    apt-get -qq -o Dpkg::Use-Pty=0 update && apt-get -qq -o Dpkg::Use-Pty=0 --no-install-recommends install postfix postfix-mysql postfix-doc fetchmail rkhunter binutils dovecot-imapd dovecot-pop3d dovecot-mysql dovecot-sieve dovecot-lmtpd libsasl2-modules && \
     rm -rf /var/lib/apt/lists/*
 COPY ./build/etc/postfix/master.cf /etc/postfix/master.cf
 
 # --- 9 Install SpamAssassin, and ClamAV
 RUN (crontab -l; printf "\n") | sort | uniq | crontab - && \
-    apt-get -qq -o Dpkg::Use-Pty=0 update && apt-get -y --no-install-recommends install spamassassin clamav sa-compile clamav-daemon unzip bzip2 arj nomarch lzop gnupg2 cabextract p7zip p7zip-full unrar-free lrzip apt-listchanges libnet-ldap-perl libauthen-sasl-perl clamav-docs daemon libio-string-perl libio-socket-ssl-perl libnet-ident-perl zip libnet-dns-perl libdbd-mysql-perl postgrey && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get -qq -o Dpkg::Use-Pty=0 update && apt-get -y --no-install-recommends install spamd clamav sa-compile clamav-daemon unzip bzip2 arj nomarch lzop gnupg2 cabextract p7zip p7zip-full unrar-free lrzip apt-listchanges libnet-ldap-perl libauthen-sasl-perl clamav-docs daemon libio-string-perl libio-socket-ssl-perl libnet-ident-perl zip libnet-dns-perl libdbd-mysql-perl postgrey && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd postgrey && \
+    useradd -M -g postgrey postgrey
 
 COPY ./build/etc/clamav/clamd.conf /etc/clamav/clamd.conf
 RUN (crontab -l; printf "@daily /usr/bin/ionice -c 3 /usr/bin/nice -n +19 /usr/bin/freshclam\n") | sort | uniq | crontab - && \
@@ -125,7 +128,7 @@ RUN (crontab -l; printf "@daily /usr/bin/ionice -c 3 /usr/bin/nice -n +19 /usr/b
     sa-update 2>&1 && \
     sa-compile --quiet 2>&1 && \
 # --- 10 Install Apache Web Server and PHP
-    apt-get -qq -o Dpkg::Use-Pty=0 update && apt-get -qq -o Dpkg::Use-Pty=0 --no-install-recommends install apache2 apache2-utils curl libapache2-mod-php php-yaml php-cgi libapache2-mod-fcgid apache2-suexec-pristine php-pear mcrypt imagemagick libruby libapache2-mod-python memcached libapache2-mod-passenger php php-common php-gd php-mysql php-imap php-cli php-cgi php-curl php-intl php-pspell php-sqlite3 php-tidy php-imagick php-xmlrpc php-xsl php-zip php-mbstring php-soap php-fpm php-opcache php-json php-readline php-xml python && \
+    apt-get -qq -o Dpkg::Use-Pty=0 update && apt-get -qq -o Dpkg::Use-Pty=0 --no-install-recommends install apache2 apache2-utils curl libapache2-mod-php php-yaml php-cgi libapache2-mod-fcgid apache2-suexec-pristine php-pear mcrypt imagemagick libruby libapache2-mod-python memcached libapache2-mod-passenger php php-common php-gd php-mysql php-imap php-cli php-cgi php-curl php-intl php-pspell php-sqlite3 php-tidy php-imagick php-xsl php-zip php-mbstring php-soap php-fpm php-opcache php-json php-readline php-xml && \
     rm -rf /var/lib/apt/lists/* && \
     /usr/sbin/a2enmod suexec rewrite ssl actions include dav_fs dav auth_digest cgi headers actions proxy_fcgi alias
 COPY ./build/etc/apache2/httpoxy.conf /etc/apache2/conf-available/
