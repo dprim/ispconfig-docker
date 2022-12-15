@@ -120,14 +120,28 @@ RUN (crontab -l; printf "\n") | sort | uniq | crontab - && \
     rm -rf /var/lib/apt/lists/*
 
 COPY ./build/etc/clamav/clamd.conf /etc/clamav/clamd.conf
+WORKDIR /tmp
 RUN (crontab -l; printf "@daily /usr/bin/ionice -c 3 /usr/bin/nice -n +19 /usr/bin/freshclam\n") | sort | uniq | crontab - && \
     freshclam --quiet && \
     sa-update 2>&1 && \
     sa-compile --quiet 2>&1 && \
 # --- 10 Install Apache Web Server and PHP
     apt-get -qq -o Dpkg::Use-Pty=0 update && apt-get -qq -o Dpkg::Use-Pty=0 --no-install-recommends install apache2 apache2-utils curl libapache2-mod-php php-yaml php-cgi libapache2-mod-fcgid apache2-suexec-pristine php-pear mcrypt imagemagick libruby libapache2-mod-python memcached libapache2-mod-passenger php php-common php-gd php-mysql php-imap php-cli php-cgi php-curl php-intl php-pspell php-sqlite3 php-tidy php-imagick php-xmlrpc php-xsl php-zip php-mbstring php-soap php-fpm php-opcache php-json php-readline php-xml python && \
+    apt-get -yq install --no-install-recommends devscripts equivs && \
+    mk-build-deps apache2 -i -r -t "apt-get -y --no-install-recommends" && \
+    apt-get source apache2 && \
+    pushd "$(find . -mindepth 1 -maxdepth 1 -type d -path "./apache2-*" -printf "%p" -quit)" > /dev/null && \
+    sed -i 's|^\(AP2_CFLAGS = .*\)$|\1 -DBIG_SECURITY_HOLE|' debian/rules && \
+    echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/force-unsafe-io && \
+    dpkg-buildpackage -uc -us -jauto && \
+    popd > /dev/null && \
+    dpkg -i apache2_*.deb apache2-bin_*.deb && \
+    apt-get -y remove devscripts apache2-build-deps && \
+    apt-get -y autoremove && \
+    rm -rf "/tmp/*" && \
     rm -rf /var/lib/apt/lists/* && \
     /usr/sbin/a2enmod suexec rewrite ssl actions include dav_fs dav auth_digest cgi headers actions proxy_fcgi alias
+
 COPY ./build/etc/apache2/httpoxy.conf /etc/apache2/conf-available/
 COPY ./build/etc/aliases /etc/aliases
 RUN apt-get -qq -o Dpkg::Use-Pty=0 update && \

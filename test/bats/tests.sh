@@ -118,3 +118,6 @@ setup() {
   docker exec "$CONTAINER" test -d "/var/lib/php$BUILD_PHP_VERS-fpm"
 }
 
+@test "apache compiled with BIG_SECURITY_HOLE" {
+  docker exec "$CONTAINER" apache2ctl -V | grep "\-D BIG_SECURITY_HOLE"
+}
